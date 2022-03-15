@@ -1,3 +1,4 @@
+from itertools import count
 import tweepy
 import pandas as pd
 
@@ -17,18 +18,34 @@ tweetsPerQuery = 100
 maxTweets = 1000
 
 # random ints that should match with a user id, if not a match then skip
-random_user_ids = [180463340, 322099225, 322429759, 642942976, 893481877, 680302528, 379330167, 439322888, 507686370, 645127599, 363438343]
+random_user_ids = [712023, 322099225, 227712905, 976796490, 765391580, 326676622, 705868308, 479987005, 848103961, 421817116]
 random_users = []
 
 # get each user
 for id in random_user_ids:
     try:
         random_users.append(api.get_user(id))
+        latest_tweet = api.user_timeline(id=api.get_user(id).id, count=220)
+
+        # users must tweet in english and users must have ~ 100 - 200 tweets
+        if len(latest_tweet) == 0 or len(latest_tweet) < 100 or latest_tweet[0].lang != "en":
+            random_users = random_users[:-1]
+            raise Exception
+
+
     except Exception:
-        pass
+        print("Invalid Id:", id)
 
 
-print(len(random_users))
+print("Valid users:", len(random_users))
 
 # next: loop through users, get n tweets (maybe 100 - 200), do same for followers and maybe followings if we want
+for user in random_users:
+    #print("user:", user.id, user.name)
+    
+    tweets = api.user_timeline(id=user.id, count=200)
+    
+    #print(tweets[2].text)
+
+
 # build csv/json with pandas
