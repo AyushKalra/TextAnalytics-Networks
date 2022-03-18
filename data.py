@@ -1,6 +1,6 @@
-from itertools import count
 import tweepy
-import pandas as pd
+import json
+import random
 
 # Twitter Credentials
 consumer_key = 'riiUgzG0nHSkUGt5c521LgcnD'
@@ -14,38 +14,175 @@ auth = tweepy.OAuthHandler(consumer_key, consumer_key_secret)
 auth.set_access_token(access_token, access_token_secret)
 api = tweepy.API(auth)
 
-tweetsPerQuery = 100
-maxTweets = 1000
 
-# random ints that should match with a user id, if not a match then skip
-random_user_ids = [712023, 322099225, 227712905, 976796490, 765391580, 326676622, 705868308, 479987005, 848103961, 421817116]
-random_users = []
-
-# get each user
-for id in random_user_ids:
-    try:
-        random_users.append(api.get_user(id))
-        latest_tweet = api.user_timeline(id=api.get_user(id).id, count=220)
-
-        # users must tweet in english and users must have ~ 100 - 200 tweets
-        if len(latest_tweet) == 0 or len(latest_tweet) < 100 or latest_tweet[0].lang != "en":
-            random_users = random_users[:-1]
-            raise Exception
+def append_to_dataset(new_user):                
+    with open('data.json', 'r+') as f:
+        file_data = json.load(f)
+        file_data['dataset'].append(new_user)
+        f.seek(0)
+        json.dump(file_data, f, indent=4)
 
 
-    except Exception:
-        print("Invalid Id:", id)
-
-
-print("Valid users:", len(random_users))
-
-# next: loop through users, get n tweets (maybe 100 - 200), do same for followers and maybe followings if we want
-for user in random_users:
-    #print("user:", user.id, user.name)
+def get_followers(user):
+    followers = []
+    for f in api.followers(id=user)[:5]:
+        followers.append(f.id)
     
-    tweets = api.user_timeline(id=user.id, count=200)
+    return followers
+
+def get_followings(user):
+    followings = []
+    for f in api.friends(id=user)[:5]:
+        followings.append(f.id)
+
+    return followings 
+
+def get_initial_user_list():
+    random_users = []
+
+    complete_data = []
+
+    # search for tweets by keyword, then get users
+    search_tweets = tweepy.Cursor(api.search, q='#ukraine', lang='en').items(80)
+
+    # get users from these tweets
+    for tweet in search_tweets:
+        tweets = api.user_timeline(id=tweet.user.id, count=61, include_rts=False)
+        
+        if len(tweets) >= 60:
+            random_users.append(tweet.user)
+
+            if len(random_users) > 10: 
+                break        
+            user = tweet.user
+            
+            # concatenate all tweets
+            corpus = " "
+            for t in tweets:
+                corpus += t.text + " "
+
+            # get follower ids
+            followers = get_followers(user.id)
+            
+            # get friend ids
+            followings = get_followings(user.id)
+        
+            # create obj for json
+            data = {"user": user.id, "corpus": corpus, "followers": followers, "followings": followings}
+            complete_data.append(data)
+            print(len(complete_data))
+        
+    # write to json file
+    json_file = open("data.json", "a")
+    json_file.write(json.dumps(complete_data))
+    json_file.close()
+
+
+def get_user_ids(users):
+    id_in_dataset = []
+
+    for user in users:
+        id_in_dataset.append(user['user'])
     
-    #print(tweets[2].text)
+    return id_in_dataset
+    
+
+def add_followers_to_dataset():
+    file = open('data.json')
+    users = json.load(file)['dataset']
+
+    in_dataset = get_user_ids(users)
+    
+    for user in users:
+        followers = user['followers']
+        for f in followers:
+            if f not in in_dataset:
+                try:
+                    print(f)
+                    tweets = api.user_timeline(id=f, count=60, include_rts=False)
+                    corpus = ""
+                    for t in tweets:
+                        corpus += t.text + " "
+
+                    next_followers = get_followers(f)
+
+                    followings = get_followings(f)
+
+                    new_data = {"user": f, "corpus": corpus, "followers": next_followers, "followings": followings}
+                    
+                    append_to_dataset(new_data)
+
+                except Exception as e:
+                    print(str(e))
 
 
-# build csv/json with pandas
+def add_followings_to_dataset():
+    file = open('data.json')
+    users = json.load(file)['dataset']
+
+    in_dataset = get_user_ids(users)
+    
+    for user in users:
+        followings = user['followings']
+        for f in followings:
+            if f not in in_dataset:
+                try:
+                    print(f)
+                    tweets = api.user_timeline(id=f, count=60, include_rts=False)
+                    corpus = ""
+                    for t in tweets:
+                        corpus += t.text + " "
+
+                    next_followers = get_followers(f)
+
+                    next_followings = get_followings(f)
+
+                    new_data = {"user": f, "corpus": corpus, "followers": next_followers, "followings": next_followings}
+                    
+                    append_to_dataset(new_data)
+
+                except Exception as e:
+                    print(str(e))
+
+
+def add_some_random():
+    file = open('data.json')
+    users = json.load(file)['dataset']
+
+    in_dataset = get_user_ids(users)
+
+    indices = random.sample(range(100, len(users)), 10)
+    print(indices)
+
+    for i in indices:
+        user = users[i]
+        followers = user['followers']
+        for f in followers:
+            if f not in in_dataset:
+                try:
+                    print(f)
+                    tweets = api.user_timeline(id=f, count=60, include_rts=False)
+                    corpus = ""
+                    for t in tweets:
+                        corpus += t.text + " "
+
+                    next_followers = get_followers(f)
+
+                    next_followings = get_followings(f)
+
+                    new_data = {"user": f, "corpus": corpus, "followers": next_followers, "followings": next_followings}
+                    
+                    append_to_dataset(new_data)
+
+                except Exception as e:
+                    print(str(e))
+
+
+if __name__ == "__main__":
+    #get_initial_user_list()
+    #add_followers_to_dataset()
+    #add_followings_to_dataset()
+    add_some_random()
+        
+
+
