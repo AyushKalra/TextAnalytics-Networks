@@ -1,3 +1,4 @@
+from regex import E
 import tweepy
 import json
 import random
@@ -16,9 +17,9 @@ api = tweepy.API(auth)
 
 
 def append_to_dataset(new_user):                
-    with open('data.json', 'r+') as f:
+    with open('dataset2.json', 'r+') as f:
         file_data = json.load(f)
-        file_data['dataset'].append(new_user)
+        file_data['dataset2'].append(new_user)
         f.seek(0)
         json.dump(file_data, f, indent=4)
 
@@ -37,45 +38,64 @@ def get_followings(user):
 
     return followings 
 
+def is_in_dataset(user):
+    file = open('dataset2.json')
+    users = json.load(file)['dataset2']
+
+    in_dataset = get_user_ids(users)
+
+    return user in in_dataset
+
+# Python Flask, golang, category theory, dynamic programming, Machine Learning, numpy, IntelliJ, jupiter notebook
+# Node.js, Javascript, Jquery, web development, software engineer, app development, python django
+
 def get_initial_user_list():
     random_users = []
 
     complete_data = []
 
     # search for tweets by keyword, then get users
-    search_tweets = tweepy.Cursor(api.search, q='#ukraine', lang='en').items(80)
+    search_tweets = tweepy.Cursor(api.search, q='App Development', lang='en').items(80)
 
     # get users from these tweets
     for tweet in search_tweets:
-        tweets = api.user_timeline(id=tweet.user.id, count=61, include_rts=False)
-        
-        if len(tweets) >= 60:
-            random_users.append(tweet.user)
+        try:
+            if not is_in_dataset(tweet.user.id):
+                tweets = api.user_timeline(id=tweet.user.id, count=61, include_rts=False)
+                
+                if len(tweets) >= 60:
+                    random_users.append(tweet.user)
 
-            if len(random_users) > 10: 
-                break        
-            user = tweet.user
-            
-            # concatenate all tweets
-            corpus = " "
-            for t in tweets:
-                corpus += t.text + " "
+                    if len(random_users) > 50: 
+                        break        
+                    user = tweet.user
+                    
+                    # concatenate all tweets
+                    corpus = " "
+                    for t in tweets:
+                        corpus += t.text + " "
 
-            # get follower ids
-            followers = get_followers(user.id)
-            
-            # get friend ids
-            followings = get_followings(user.id)
-        
-            # create obj for json
-            data = {"user": user.id, "corpus": corpus, "followers": followers, "followings": followings}
-            complete_data.append(data)
-            print(len(complete_data))
-        
+                    # get follower ids
+                    followers = get_followers(user.id)
+                    
+                    # get friend ids
+                    followings = get_followings(user.id)
+                
+                    # create obj for json
+                    data = {"user": user.id, "corpus": corpus, "followers": followers, "followings": followings}
+                    complete_data.append(data)
+                    print(len(complete_data))
+
+        except Exception as e:
+            print(E)
+
+            for u in complete_data:
+                append_to_dataset(u)
+    
     # write to json file
-    json_file = open("data.json", "a")
-    json_file.write(json.dumps(complete_data))
-    json_file.close()
+    #json_file = open("dataset2.json", "a")
+    #json_file.write(json.dumps(complete_data, indent=4))
+    #json_file.close()
 
 
 def get_user_ids(users):
@@ -179,10 +199,10 @@ def add_some_random():
 
 
 if __name__ == "__main__":
-    #get_initial_user_list()
+    get_initial_user_list()
     #add_followers_to_dataset()
     #add_followings_to_dataset()
-    add_some_random()
+    #add_some_random()
         
 
 
