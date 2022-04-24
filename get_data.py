@@ -80,7 +80,7 @@ def get_initial_user_list():
                 if len(tweets) >= 60:
                     random_users.append(tweet.user)
 
-                    if len(random_users) > 2: 
+                    if len(random_users) > 50: 
                         break       
 
                     user = tweet.user
